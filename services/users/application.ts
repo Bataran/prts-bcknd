@@ -3,26 +3,31 @@ import { RestComponent, RestServer } from "@loopback/rest";
 import { UserController } from './controller';
 import { ApiSpec } from './api-spec';
 import { UserRepository } from './repository';
-import { RepositoryMixin } from '@loopback/repository';
+import { ServerContext } from './serverContext';
+
 const config = require('./config/config.json');
 
-export class UsersMicroservice extends RepositoryMixin(Application) {
+export class UsersMicroservice extends Application {
   constructor() {
-    super({
-      components: [RestComponent],
-      controllers: [UserController],
-      repositories: [UserRepository]
-    });
+    super();
+    this.component(RestComponent);
+    this.server(RestServer, 'rest.v1');
   }
 
   async start() {
     try {
-      const server = await this.getServer(RestServer);
+      const server = await this.getServer('rest.v1') as RestServer;
       server.api(ApiSpec);
-      server.bind("rest.port").to(config.port);
-      await super.start();
+
+      const serverContext = new ServerContext(server);
+      serverContext.bindPort(config.port);
+      serverContext.bindController(UserController);
+      serverContext.bindRepository(UserRepository);
+
+      await serverContext.start();
     } catch (error) {
       console.error(error);
+      throw error;
     }
   }
 }
